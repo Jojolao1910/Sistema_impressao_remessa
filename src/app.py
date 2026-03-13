@@ -81,6 +81,8 @@ def remover_remessa(index):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
-    # Rodando na porta 8027 conforme solicitado
-    app.run(host='0.0.0.0', port=8027, debug=True)
+if __name__ == "__main__":
+    # O Railway obriga o uso da variável de ambiente PORT
+    port = int(os.environ.get("PORT", 8027))
+    # O host deve ser 0.0.0.0 para aceitar conexões externas
+    app.run(host="0.0.0.0", port=port)
