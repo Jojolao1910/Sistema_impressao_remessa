@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Impressão de Remessas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="flex justify-between items-center mb-8 bg-white p-6 rounded-lg shadow-md">
+            <h1 class="text-2xl font-bold text-blue-600">Painel Admin - Remessas Para Impressão</h1>
+            <div class="flex items-center space-x-2">
+                <span id="status" class="w-3 h-3 bg-green-500 rounded-full"></span>
+                <span class="text-sm text-gray-600">Online</span>
+            </div>
+        </header>
+
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
+                <h2 class="font-semibold text-gray-700">Fila de Impressão</h2>
+                <button onclick="buscarRemessas()" class="text-sm bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded transition">
+                    Atualizar
+                </button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+                        <tr>
+                            <th class="px-6 py-3">Número da Remessa</th>
+                            <th class="px-6 py-3">Operador</th>
+                            <th class="px-6 py-3">Horário</th>
+                            <th class="px-6 py-3 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-remessas" class="divide-y divide-gray-200">
+                        <!-- Remessas serão inseridas aqui -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="vazio" class="hidden p-12 text-center text-gray-500">
+                Nenhuma remessa pendente para impressão.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = `${window.location.origin}/api/remessas`;
+        let previousRemessas = null; // usado para detectar novos itens
+
+        async function buscarRemessas() {
+            try {
+                const response = await fetch(API_URL);
+                const remessas = await response.json();
+
+                // Notificar apenas quando houver novos itens após carregamento inicial
+                if (previousRemessas !== null) {
+                    const diff = remessas.length - previousRemessas.length;
+                    if (diff > 0) {
+                        notifyNew(diff);
+                    }
+                }
+                previousRemessas = remessas.slice();
+                renderizarRemessas(remessas);
+            } catch (error) {
+                console.error('Erro ao buscar remessas:', error);
+            }
+        }
+
+        function renderizarRemessas(remessas) {
+            const lista = document.getElementById('lista-remessas');
+            const vazio = document.getElementById('vazio');
+            
+            lista.innerHTML = '';
+            
+            if (remessas.length === 0) {
+                vazio.classList.remove('hidden');
+            } else {
+                vazio.classList.add('hidden');
+                const total = remessas.length;
+                remessas.slice().reverse().forEach((remessa, pos) => {
+                    const indexOriginal = total - 1 - pos;
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50 transition';
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-mono text-lg font-bold text-gray-800">${remessa.numero}</td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                                ${remessa.operador}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">${remessa.timestamp}</td>
+                        <td class="px-6 py-4 text-right space-x-2">
+                            <button onclick="copiar('${remessa.numero}')" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm transition">
+                                Copiar
+                            </button>
+                            <button onclick="remover(${indexOriginal})" class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition">
+                                Impresso / Apagar
+                            </button>
+                        </td>
+                    `;
+                    lista.appendChild(tr);
+                });
+            }
+        }
+
+        async function remover(index) {
+            if (!confirm('Confirmar que a etiqueta foi impressa e remover da lista?')) return;
+            
+            try {
+                await fetch(`${API_URL}/${index}`, { method: 'DELETE' });
+                buscarRemessas();
+            } catch (error) {
+                alert('Erro ao remover remessa');
+            }
+        }
+
+        async function copiar(texto) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(texto);
+                    alert('Número copiado: ' + texto);
+                    return;
+                }
+            } catch (_) {
+                // Ignorar erro e tentar fallback
+            }
+
+            // Fallback para contextos não seguros (HTTP) ou navegadores sem Clipboard API
+            const ta = document.createElement('textarea');
+            ta.value = texto;
+            ta.setAttribute('readonly', '');
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try {
+                const ok = document.execCommand('copy');
+                if (ok) {
+                    alert('Número copiado: ' + texto);
+                } else {
+                    throw new Error('execCommand falhou');
+                }
+            } catch (e) {
+                prompt('Copie o número manualmente:', texto);
+            } finally {
+                document.body.removeChild(ta);
+            }
+        }
+
+        // Alerta visual e som quando chegam novas remessas
+        function notifyNew(qtd) {
+            try { playNotification(); } catch (_) {}
+            const plural = qtd > 1 ? 'remessas' : 'remessa';
+            alert(`Chegou ${qtd} ${plural} para impressão`);
+        }
+
+        // Som de notificação agradável (dois tons com leve decaimento)
+        function playNotification() {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+
+            const master = ctx.createGain();
+            master.gain.value = 0.2;
+            master.connect(ctx.destination);
+
+            // Primeiro tom
+            const tone1 = ctx.createOscillator();
+            const g1 = ctx.createGain();
+            tone1.type = 'sine';
+            tone1.frequency.value = 880; // A5
+            tone1.connect(g1);
+            g1.connect(master);
+
+            // Segundo tom (um pouco mais agudo)
+            const tone2 = ctx.createOscillator();
+            const g2 = ctx.createGain();
+            tone2.type = 'sine';
+            tone2.frequency.value = 1174.66; // D6 (~)
+            tone2.connect(g2);
+            g2.connect(master);
+
+            const now = ctx.currentTime;
+            // Envelope leve para evitar estalo
+            [g1, g2].forEach((g, i) => {
+                const start = now + i * 0.12; // segundo tom entra depois
+                g.gain.setValueAtTime(0, start);
+                g.gain.linearRampToValueAtTime(0.7, start + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, start + 0.35);
+            });
+
+            tone1.start(now);
+            tone1.stop(now + 0.4);
+            tone2.start(now + 0.12);
+            tone2.stop(now + 0.52);
+
+            tone2.onended = () => ctx.close();
+        }
+
+        // Atualização automática a cada 5 segundos
+        setInterval(buscarRemessas, 5000);
+        
+        // Busca inicial
+        buscarRemessas();
+    </script>
+</body>
+</html>

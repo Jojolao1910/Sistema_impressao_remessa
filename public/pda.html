@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDA - Bipar Remessas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body class="bg-blue-600 min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6">
+        <header class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-gray-800">Bipe o Código</h1>
+            <div class="flex items-center justify-center space-x-2 mt-2">
+                <span class="text-sm text-gray-600">Operador:</span>
+                <span id="operador" class="text-sm font-bold text-blue-600"></span>
+                <button onclick="trocarOperador()" class="text-xs text-red-500 hover:text-red-700 underline">Trocar</button>
+            </div>
+        </header>
+
+        <form id="form-pda" class="space-y-6">
+            <div>
+                <label for="numero" class="block text-sm font-medium text-gray-700 mb-2">Número da Remessa</label>
+                <input 
+                    type="text" 
+                    id="numero" 
+                    autofocus
+                    autocomplete="off"
+                    placeholder="Ex: CNBR00129..."
+                    class="w-full px-4 py-4 border-2 border-blue-100 rounded-xl focus:border-blue-500 focus:ring-blue-500 text-xl font-mono uppercase"
+                >
+            </div>
+            
+            <button 
+                type="submit" 
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition"
+            >
+                ENVIAR PARA IMPRESSÃO
+            </button>
+        </form>
+
+        <div id="feedback" class="mt-6 hidden p-4 rounded-xl text-center font-semibold">
+            <!-- Feedback de sucesso ou erro -->
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-100">
+            <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Últimos Bipados</h3>
+            <ul id="historico" class="space-y-2">
+                <!-- Histórico local simples -->
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = `${window.location.origin}/api/remessas`;
+        const form = document.getElementById('form-pda');
+        const input = document.getElementById('numero');
+        const feedback = document.getElementById('feedback');
+        const historico = document.getElementById('historico');
+        const operadorSpan = document.getElementById('operador');
+
+        // Verificar login e exibir nome do operador
+        window.addEventListener('load', () => {
+            const operador = localStorage.getItem('operador');
+            if (!operador) {
+                window.location.href = '/login.html';
+                return;
+            }
+            operadorSpan.textContent = operador;
+        });
+
+        // Função para trocar operador
+        function trocarOperador() {
+            if (confirm('Deseja trocar para outro operador?')) {
+                localStorage.removeItem('operador');
+                window.location.href = '/login.html';
+            }
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const numero = input.value.trim().toUpperCase();
+            const operador = localStorage.getItem('operador');
+            
+            if (!numero) return;
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numero, operador })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    mostrarFeedback('Remessa enviada!', 'bg-green-100 text-green-700');
+                    adicionarAoHistorico(numero);
+                    input.value = '';
+                    input.focus();
+                } else {
+                    // Verificar se o erro é relacionado ao nome do operador
+                    if (data.error && data.error.includes('Nome do operador não permitido')) {
+                        mostrarFeedback('Nome não permitido. Troque de operador.', 'bg-red-100 text-red-700');
+                        // Dar opção de trocar operador
+                        setTimeout(() => {
+                            if (confirm('Seu nome não é apropriado. Deseja trocar para outro operador?')) {
+                                localStorage.removeItem('operador');
+                                window.location.href = '/login.html';
+                            }
+                        }, 1000);
+                    } else {
+                        mostrarFeedback('Erro ao enviar', 'bg-red-100 text-red-700');
+                    }
+                }
+            } catch (error) {
+                mostrarFeedback('Erro de conexão', 'bg-red-100 text-red-700');
+            }
+        });
+
+        function mostrarFeedback(msg, classes) {
+            feedback.textContent = msg;
+            feedback.className = `mt-6 p-4 rounded-xl text-center font-semibold ${classes}`;
+            feedback.classList.remove('hidden');
+            setTimeout(() => feedback.classList.add('hidden'), 3000);
+        }
+
+        function adicionarAoHistorico(numero) {
+            const li = document.createElement('li');
+            li.className = 'flex justify-between items-center text-sm text-gray-600 bg-gray-50 p-2 rounded';
+            li.innerHTML = `<span>${numero}</span> <span class="text-green-500">✓</span>`;
+            
+            if (historico.firstChild) {
+                historico.insertBefore(li, historico.firstChild);
+            } else {
+                historico.appendChild(li);
+            }
+
+            // Manter apenas os últimos 5 no histórico visual do PDA
+            if (historico.children.length > 5) {
+                historico.removeChild(historico.lastChild);
+            }
+        }
+    </script>
+</body>
+</html>

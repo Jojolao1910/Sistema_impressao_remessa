@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sistema de Remessas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body class="bg-blue-600 min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl p-6">
+        <header class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-gray-800">Sistema de Remessas</h1>
+            <p class="text-gray-600 mt-2">Informe seu nome para continuar</p>
+        </header>
+
+        <form id="form-login" class="space-y-6">
+            <div>
+                <label for="nome" class="block text-sm font-medium text-gray-700 mb-2">Seu Nome</label>
+                <input 
+                    type="text" 
+                    id="nome" 
+                    autofocus
+                    autocomplete="off"
+                    placeholder="Digite seu nome completo"
+                    class="w-full px-4 py-4 border-2 border-blue-100 rounded-xl focus:border-blue-500 focus:ring-blue-500 text-xl"
+                >
+            </div>
+            
+            <button 
+                type="submit" 
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transform active:scale-95 transition"
+            >
+                ENTRAR NO SISTEMA
+            </button>
+        </form>
+
+        <div id="feedback" class="mt-6 hidden p-4 rounded-xl text-center font-semibold">
+            <!-- Feedback de sucesso ou erro -->
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('form-login');
+        const input = document.getElementById('nome');
+        const feedback = document.getElementById('feedback');
+
+        // Lista de palavras ofensivas e racialmente depreciativas
+        const palavrasOfensivas = [
+            'preto', 'preta', 'pretinho', 'pretinha', 'macaco', 'macaca', 'mono', 'mona',
+            'negro', 'negra', 'neguinho', 'neguinha', 'morena', 'moreno', 'babaca',
+            'idiot', 'burro', 'burra', 'vagabund', 'porra', 'caralh', 'puta', 'merda',
+            'desgraç', 'filho da puta', 'fud', 'foder', 'cu', 'buceta', 'pica',
+            'rola', 'pau', 'bicho', 'viad', 'bicha', 'traveco', 'sapatão',
+            'otario', 'otaria', 'corno', 'corn', 'pilantr', 'ladrão', 'ladra',
+            'fascist', 'nazist', 'racist', 'xenofob', 'homofob', 'transfob'
+        ];
+
+        // Função para verificar se o nome contém palavras ofensivas
+        function contemPalavraOfensiva(nome) {
+            const nomeLower = nome.toLowerCase();
+            const nomeSemEspacos = nomeLower.replace(/\s+/g, '');
+            const nomeSemAcentos = nomeLower.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            
+            return palavrasOfensivas.some(palavra => {
+                // Verifica palavra exata ou como substring
+                return nomeLower.includes(palavra) || 
+                       nomeSemEspacos.includes(palavra) ||
+                       nomeSemAcentos.includes(palavra);
+            });
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nome = input.value.trim();
+            
+            if (!nome || nome.length < 2) {
+                mostrarFeedback('Por favor, digite seu nome completo', 'bg-red-100 text-red-700');
+                return;
+            }
+
+            // Verificar se o nome contém palavras ofensivas
+            if (contemPalavraOfensiva(nome)) {
+                mostrarFeedback('Nome não permitido. Por favor, use um nome apropriado.', 'bg-red-100 text-red-700');
+                input.value = '';
+                input.focus();
+                return;
+            }
+
+            // Salvar nome do operador no localStorage
+            localStorage.setItem('operador', nome);
+            
+            // Redirecionar para a tela de envio de remessas
+            window.location.href = '/pda.html';
+        });
+
+        function mostrarFeedback(msg, classes) {
+            feedback.textContent = msg;
+            feedback.className = `mt-6 p-4 rounded-xl text-center font-semibold ${classes}`;
+            feedback.classList.remove('hidden');
+            setTimeout(() => feedback.classList.add('hidden'), 3000);
+        }
+
+        // Verificar se já existe um operador logado
+        window.addEventListener('load', () => {
+            const operador = localStorage.getItem('operador');
+            if (operador) {
+                window.location.href = '/pda.html';
+            }
+        });
+    </script>
+</body>
+</html>
